@@ -1,0 +1,13 @@
+repos:
+
+- repo: https://github.com/psf/black
+  rev: stable
+  hooks:
+  - id: black
+    language_version: python3.6
+    exclude: setup.py
+
+- repo: https://gitlab.com/pycqa/flake8.git
+  rev: "3.7.8"
+  hooks:
+  - id: flake8

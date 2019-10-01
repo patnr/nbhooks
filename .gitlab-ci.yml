@@ -1,0 +1,56 @@
+stages:
+  - test
+  - build
+  - publish
+
+.tests:
+  stage: test
+  script:
+    - pip install .
+
+    # Run unit tests
+    - pip install pytest~=5.1
+    - pytest --junitxml=tests.junit.xml
+
+    # Run CLI tests
+    - apt-get update && apt-get install bats
+    - bats tests/test_cli.sh
+
+    # Run flake8
+    - pip install flake8~=3.7
+    - flake8 src
+
+    # Run black (for Python 3.6+)
+    - >
+      if [[ $(python --version) < "Python 3.6" ]]; then
+        echo "Skipping black for $(python --version) < 3.6"
+      else
+        pip install black
+        black --check --diff --target-version py35 src
+      fi
+
+  artifacts:
+    reports:
+      junit: tests.junit.xml
+
+tests-3.5:
+  extends: .tests
+  image: python:3.5
+
+tests-3.6:
+  extends: .tests
+  image: python:3.6
+
+tests-3.7:
+  extends: .tests
+  image: python:3.7
+
+build:
+  stage: build
+  image: python:3.6
+  script:
+    - python setup.py sdist
+  artifacts:
+    paths:
+      - dist/*.tar.gz
+  when: manual
