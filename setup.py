@@ -1,24 +1,34 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 from pathlib import Path
 
 this_dir = Path(__file__).parent
 
-with this_dir.joinpath("src/nbhooks/__version__.py").open(encoding="utf-8") as f:
-    _temp = {}
-    exec(f.read(), _temp)
-    version = _temp.pop("__version__")
+# Load package version
+with this_dir.joinpath("src/nbhooks.py").open(encoding="utf-8") as f:
+    for line in f:
+        d = {}
+        try:
+            exec(line, d)
+        except Exception:
+            continue
+        try:
+            version = d["__version__"]
+            break
+        except KeyError:
+            continue
+    else:
+        raise Exception("__version__ not found in {}".format(f.name))
+
 
 with this_dir.joinpath("README.md").open(encoding="utf-8") as f:
     long_description = f.read()
 
-repo_url = "https://github.com/iamlikeme/pre-commit-hooks-jupyter/"
-
 extras_require = {}
-extras_require["test"] = ["pytest ~= 5.1"]
-extras_require["dev"] = extras_require["test"] + [
+extras_require["dev"] = [
     "flake8 ~= 3.7",
     "ipython",
     "pre-commit ~= 1.18",
+    "pytest ~= 5.1",
 ]
 
 setup(
@@ -26,20 +36,23 @@ setup(
     version=version,
     description="Pre-commit hooks for Jupyter notebooks",
     long_description=long_description,
-    package_dir={"": "src"},
-    packages=find_packages("src"),
+    license="MIT",
     author="Piotr Janiszewski",
     author_email="i.am.like.me@gmail.com",
-    url=repo_url,
-    license="MIT",
-    download_url=repo_url + "archive/v{}".format(version),
-    classifiers=[],
+    url="https://gitlab.com/iamlikeme/pre-commit-hooks-jupyter",
+    # TODO: download_url=...,
+    package_dir={"": "src"},
+    py_modules=["nbhooks"],
     python_requires="~= 3.5",
-    install_requires=["nbformat ~= 4.0"],
+    install_requires=[
+        "click >= 7.0",
+        "nbformat ~= 4.0",
+    ],
     extras_require=extras_require,
     entry_points={
         "console_scripts": [
-            "nbhooks=nbhooks.cli:main",
+            "nb-ensure-clean=nbhooks:main",
         ],
     },
+    # TODO: classifiers=[],
 )

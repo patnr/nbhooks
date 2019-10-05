@@ -1,2 +1,5 @@
+import nbhooks
+
+
 def test_dummy():
-    assert True
+    assert nbhooks
