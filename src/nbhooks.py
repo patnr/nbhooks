@@ -55,17 +55,36 @@ def check_notebook_is_clean(nb: dict, meta: str = "") -> None:
             raise DirtyNotebookError("Notebook contains blacklisted cell metadata")
 
 
-err = partial(click.secho, fg="red", err=True)
-out = partial(click.secho, err=True)
+echo = partial(click.secho, err=True)
 
 
-@click.command()
+@click.command(context_settings=dict(help_option_names=["-h", "--help"]))
 @click.argument("src", required=False, nargs=-1)
-@click.option("-m", "--meta", default="")
-@click.option("-q", "--quiet", is_flag=True)
-@click.option("-v", "--verbose", is_flag=True)
+@click.option(
+    "-m",
+    "--meta",
+    default="",
+    help="A regular expression that matches blacklisted metadata keys "
+    "(i.e. those which renders a notebook dirty).",
+)
+@click.option(
+    "-q", "--quiet", is_flag=True, help="Do not emit non-error messages to stderr."
+)
+@click.option(
+    "-v",
+    "--verbose",
+    is_flag=True,
+    help="Emit messages about clean and ignored files to stderr.",
+)
 @click.pass_context
 def main(ctx: click.Context, src: str, meta: str, quiet: bool, verbose: bool):
+    """
+    Ensure that Jupyter notebooks given by SRC are clean,
+    i.e. do not contain outputs, execution counts or blacklisted metadata keys.
+    Only code-cells are checked.
+
+    The exit code is 1 if any notebook is dirty, 0 otherwise.
+    """
     sources = set()
     for s in src:
         p = Path(s)
@@ -76,13 +95,13 @@ def main(ctx: click.Context, src: str, meta: str, quiet: bool, verbose: bool):
         elif p.is_dir():
             sources.update(map(str, p.glob("**/*.ipynb")))
         else:
-            out("Invalid path: {}".format(s), fg="red")
+            echo("Invalid path: {}".format(s), fg="red")
             ctx.exit(EXIT_CODES["invalid_path"])
 
     report = []
     for s in sorted(sources):
         if not quiet:
-            out(".", nl=False)
+            echo(".", nl=False)
 
         d = {"name": getattr(s, "name", s)}
         report.append(d)
@@ -101,18 +120,16 @@ def main(ctx: click.Context, src: str, meta: str, quiet: bool, verbose: bool):
             d["error"] = str(e)
 
     if not quiet:
-        out("\n")
+        echo("\n")
 
-    out(format_report(report, quiet=quiet, verbose=verbose))
+    echo(format_report(report, quiet=quiet, verbose=verbose))
 
     if any(d["status"] == DIRTY for d in report):
+        echo(":(", bold=True, fg="red")
         exit_code = EXIT_CODES["dirty"]
-        color = "red"
     else:
+        echo(":)", bold=True, fg="green")
         exit_code = EXIT_CODES["clean"]
-        color = "green"
-
-    out(":)", bold=True, fg=color)
     ctx.exit(exit_code)
 
 
