@@ -14,6 +14,13 @@ CLEAN = "clean"
 DIRTY = "dirty"
 IGNORED = "ignored"
 
+EXIT_CODES = {
+    "clean": 0,
+    "dirty": 1,
+    # "invalid usage": 2, - this is handled by click
+    "invalid_path": 3,
+}
+
 
 class DirtyNotebookError(Exception):
     pass
@@ -69,7 +76,8 @@ def main(ctx: click.Context, src: str, meta: str, quiet: bool, verbose: bool):
         elif p.is_dir():
             sources.update(map(str, p.glob("**/*.ipynb")))
         else:
-            err("Invalid path: {}".format(s))
+            out("Invalid path: {}".format(s), fg="red")
+            ctx.exit(EXIT_CODES["invalid_path"])
 
     report = []
     for s in sorted(sources):
@@ -97,13 +105,15 @@ def main(ctx: click.Context, src: str, meta: str, quiet: bool, verbose: bool):
 
     out(format_report(report, quiet=quiet, verbose=verbose))
 
-    return_code = 1 if any(d["status"] == DIRTY for d in report) else 0
-    if not quiet:
-        if return_code == 0:
-            out(":)", bold=True, fg="green")
-        else:
-            out(":(", bold=True, fg="red")
-    ctx.exit(return_code)
+    if any(d["status"] == DIRTY for d in report):
+        exit_code = EXIT_CODES["dirty"]
+        color = "red"
+    else:
+        exit_code = EXIT_CODES["clean"]
+        color = "green"
+
+    out(":)", bold=True, fg=color)
+    ctx.exit(exit_code)
 
 
 def format_report(report: list, quiet: bool = False, verbose: bool = False) -> str:

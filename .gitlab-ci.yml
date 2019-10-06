@@ -12,10 +12,6 @@ stages:
     - pip install pytest~=5.1
     - pytest --junitxml=tests.junit.xml
 
-    # Run CLI tests
-    - apt-get update && apt-get install bats
-    - bats tests/test_cli.sh
-
     # Run flake8
     - pip install flake8~=3.7
     - flake8 src
@@ -28,6 +24,9 @@ stages:
         pip install black
         black --check --diff --target-version py35 src
       fi
+
+    # Verify that scripts were installed
+    - nb-ensure-clean --help
 
   artifacts:
     reports:
