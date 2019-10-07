@@ -1,10 +1,12 @@
 stages:
   - test
-  - build
-  - publish
+  - release
 
 .tests:
   stage: test
+  only:
+    - merge_requests
+    - web
   script:
     - pip install .
 
@@ -44,12 +46,15 @@ tests-3.7:
   extends: .tests
   image: python:3.7
 
-build:
-  stage: build
-  image: python:3.6
+release:
+  stage: release
+  only:
+    - tags
+  image: python:3.7-slim
   script:
-    - python setup.py sdist
-  artifacts:
-    paths:
-      - dist/*.tar.gz
-  when: manual
+    - PACKAGE_VERSION=$(python setup.py --version)
+    - >
+      if [ $PACKAGE_VERSION != $CI_COMMIT_TAG ]; then
+        echo "Commit tag $CI_COMMIT_TAG does not match package version $PACKAGE_VERSION"
+        exit 1
+      fi
