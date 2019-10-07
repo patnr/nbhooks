@@ -5,6 +5,7 @@ stages:
 .tests:
   stage: test
   only:
+    - master
     - merge_requests
     - web
   script:
