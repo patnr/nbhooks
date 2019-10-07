@@ -37,15 +37,15 @@ stages:
 
 tests-3.5:
   extends: .tests
-  image: python:3.5
+  image: python:3.5-slim
 
 tests-3.6:
   extends: .tests
-  image: python:3.6
+  image: python:3.6-slim
 
 tests-3.7:
   extends: .tests
-  image: python:3.7
+  image: python:3.7-slim
 
 release:
   stage: release
