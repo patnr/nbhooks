@@ -8,7 +8,7 @@ import sys
 import click
 import nbformat
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 CLEAN = "clean"
 DIRTY = "dirty"
@@ -40,11 +40,11 @@ def i_meta(cell):
     return statement, condition, fix
 def i_answer(cell):
     statement      = "de-commented show_answer"
-    def condition(): return any(re.match(" *show_answer", ln) for ln in cell["source"])
+    def condition(): return any(re.match(" *show_answer", ln) for ln in cell["source"].split("\n"))
     def       fix():
-        for i, ln in enumerate(cell["source"]):
-            ln = re.sub(r"^ *show_answer", r"#show_answer", ln)
-            cell["source"][i] = ln
+        new = cell["source"].split("\n")
+        new = [re.sub(r"^ *show_answer", r"#show_answer", ln) for ln in new]
+        cell["source"] = "\n".join(new)
     return statement, condition, fix
 
 
