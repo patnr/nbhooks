@@ -1,0 +1,165 @@
+#!/usr/bin/env python3
+
+import sys
+from subprocess import check_output
+import re
+
+from pylib.std import *
+
+def print_c(*args,c='blue',**kwargs):
+    """Print with color."""
+    termcolors={
+        'blue'      : '\033[94m',
+        'green'     : '\033[92m',
+        'OKblue'    : '\033[94m',
+        'OKgreen'   : '\033[92m',
+        'WARNING'   : '\033[93m',
+        'FAIL'      : '\033[91m',
+        'ENDC'      : '\033[0m' ,
+        'header'    : '\033[95m',
+        'bold'      : '\033[1m' ,
+        'underline' : '\033[4m' ,
+    }
+    s = ' '.join([str(k) for k in args])
+    print(termcolors[c] + s + termcolors['ENDC'],**kwargs)
+
+def uinput(string):
+    """Git hooks do not use standard input
+    => Cannot use builtin input().
+    Ref https://stackoverflow.com/a/10015707"""
+    with open('/dev/tty') as sys.stdin:
+        answer = input(string)
+    return answer
+
+def prompt_choice(choices="yes/no/abort", default="no", statement="Deal with it"):
+    "Get validated user choice, as first letter of the supplied choices."
+
+    # Ensure first letters are unique
+    c0s = [c[0] for c in choices.split("/")]
+    assert len(set(c0s))==len(c0s), "Choices have non-unique fist letters."
+
+    # Get valid choice
+    while True:
+        choice = uinput(statement+"? " + choices+": ")
+        choice = choice or default
+        choice = choice[0]      # Use 1st letter only
+        choice = choice.lower() # De-capitalize
+
+        if choice in c0s: break
+        else: print(choice, "is not among choices: '"+choices+"'.")
+
+    return choice
+
+def i_exec(cell):
+    statement      = "non-null execution_count"
+    def condition(): return cell["execution_count"] is not None
+    def       fix(): cell["execution_count"] = None
+    return statement, condition, fix
+def i_output(cell):
+    statement      = "output without 'pin_output'"
+    def condition(): return cell["outputs"] and all("pin_output" not in ln for ln in cell["source"])
+    def       fix(): cell["outputs"] = []
+    return statement, condition, fix
+def i_meta(cell):
+    statement      = "output with metadata"
+    def condition(): return cell["metadata"]
+    def       fix(): cell["metadata"] = {}
+    return statement, condition, fix
+def i_answer(cell):
+    statement      = "de-commented show_answer"
+    def condition(): return any(re.match(" *show_answer", ln) for ln in cell["source"])
+    def       fix():
+        for i, ln in enumerate(cell["source"]):
+            ln = re.sub(r"^ *show_answer", r"#show_answer", ln)
+            cell["source"][i] = ln
+    return statement, condition, fix
+
+
+def process_cell(cell, read_only):
+    if cell["cell_type"] == "code":
+
+        # Find issues
+        issues = []
+        for issue in [i_exec, i_output, i_meta, i_answer]:
+            statement, condition, fix = issue(cell)
+            if condition():
+                issues.append([statement, fix])
+
+        if issues:
+
+            # Print issues
+            print_c("This cell:", c="header")
+            print(JsonDict(cell))
+            print_c("has these issues:", c="header")
+            print_c("- "+"\n- ".join([issue[0] for issue in issues]), c="WARNING")
+
+            # Fix
+            if read_only:
+                print("Auto-fixing not possible because file has changes in work tree.")
+                return False
+            else:
+                choice = prompt_choice()
+                if choice=="a":
+                    sys.exit(1) # Abort
+                elif "y" == choice:
+                    for issue in issues:
+                        issue[1]()
+
+
+import json
+def process_file(nb_name, read_only):
+    # Get staged file
+    data = check_output(["git", "show", ":"+nb_name])
+    # Parse notebook
+    try:
+        nb = json.loads(data)
+    except JSONDecodeError:
+        print("File could not be parsed.")
+        sys.exit(1)
+
+    for cell in nb["cells"]:
+        old = cell.copy()
+        process_cell(cell, read_only)
+
+        # If modified: stage changes
+        if not read_only and cell!=old:
+            with open(nb_name,"w") as F:
+                json.dump(nb,F,indent=1)
+
+            # Don't add. That's not what standard PC hooks do.
+            # check_output(["git", "add", nb_name])
+
+
+
+if __name__ == "__main__":
+
+    # Get staged ipynb files
+    staged = check_output(["git", "diff", "--staged", "--name-only"])
+    staged = staged.decode().split("\n")[:-1]
+    staged = [f for f in staged if f.endswith(".ipynb")]
+    if len(staged)==0: sys.exit(0)
+
+    # Get those that have changes in working tree
+    changed = check_output(["git", "diff", "--name-only"])
+    changed = changed.decode().split("\n")[:-1]
+    changed = [f for f in changed if f in staged]
+
+    # Stash -- deactivated coz I always get CONFLICTS
+    # msg = "precommit stash"
+    # check_output(["git", "stash", "--keep-index", "-m", "'"+msg+"'"])
+    # stash = check_output(["git", "stash", "list"]).decode().split("\n")
+    # stash = [s for s in stash if msg in s][0]
+    # stash = re.match("(stash@{\d*})",stash).group()
+
+    # Process files
+    found_issues = False
+    for f in staged:
+        print_c("Processing", f, c="header")
+        print_c("***********************************************",c="green")
+        process_file(f, f in changed)
+
+    # Apply stash
+    # check_output([ "git", "stash", "pop", stash ])
+
+    if found_issues:
+        sys.exit(1)
