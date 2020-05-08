@@ -117,17 +117,17 @@ def process_file(nb_name, read_only):
         print("File could not be parsed.")
         sys.exit(1)
 
+    old = nb.copy()
     for cell in nb["cells"]:
-        old = cell.copy()
         process_cell(cell, read_only)
 
-        # If modified: stage changes
-        if not read_only and cell!=old:
-            with open(nb_name,"w") as F:
-                json.dump(nb,F,indent=1)
+    # If modified: stage changes
+    if not read_only and nb!=old:
+        with open(nb_name,"w") as F:
+            json.dump(nb,F,indent=1)
 
-            # Don't add. That's not what standard PC hooks do.
-            # check_output(["git", "add", nb_name])
+        # Don't add. That's not what standard PC hooks do.
+        # check_output(["git", "add", nb_name])
 
 
 
