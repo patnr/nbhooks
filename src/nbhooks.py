@@ -8,7 +8,7 @@ import sys
 import click
 import nbformat
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 CLEAN = "clean"
 DIRTY = "dirty"
@@ -22,40 +22,77 @@ EXIT_CODES = {
 }
 
 
+
+def i_exec(cell):
+    statement      = "non-null execution_count"
+    def condition(): return cell["execution_count"] is not None
+    def       fix(): cell["execution_count"] = None
+    return statement, condition, fix
+def i_output(cell):
+    statement      = "output without 'pin_output'"
+    def condition(): return cell["outputs"] and all("pin_output" not in ln for ln in cell["source"])
+    def       fix(): cell["outputs"] = []
+    return statement, condition, fix
+def i_meta(cell):
+    statement      = "output with metadata"
+    def condition(): return cell["metadata"]
+    def       fix(): cell["metadata"] = {}
+    return statement, condition, fix
+def i_answer(cell):
+    statement      = "de-commented show_answer"
+    def condition(): return any(re.match(" *show_answer", ln) for ln in cell["source"])
+    def       fix():
+        for i, ln in enumerate(cell["source"]):
+            ln = re.sub(r"^ *show_answer", r"#show_answer", ln)
+            cell["source"][i] = ln
+    return statement, condition, fix
+
+
+import json
+def process_cell(cell, meta):
+    # Find issues
+    issues = []
+    for issue in [i_exec, i_output, i_meta, i_answer]:
+        statement, condition, fix = issue(cell)
+        if condition():
+            issues.append([statement, fix])
+
+    # Print issues
+    if issues:
+        hecho("\nThese issues:")
+        echo("- "+"\n- ".join([issue[0] for issue in issues]),fg="yellow")
+        hecho("are present in the below cell:")
+        echo(json.dumps(cell,indent=4))
+
+    # Fix issues
+    for issue in issues:
+        issue[1]()
+
+    # Report
+    return bool(issues)
+
+
 class DirtyNotebookError(Exception):
     pass
 
 
-def iter_code_cells(notebook: dict) -> Iterator[dict]:
-    yield from (
-        cell for cell in notebook.get("cells", []) if cell.get("cell_type") == "code"
-    )
+def process_file(nb, meta):
+
+    had_issues = False
+    for cell in nb["cells"]:
+        if cell["cell_type"] == "code":
+            had_issues |= process_cell(cell, meta)
+
+    if had_issues:
+        raise DirtyNotebookError("Notebook had issues.")
 
 
-def cell_has_execution_count(cell: dict) -> bool:
-    return cell.get("execution_count") is not None
 
 
-def cell_has_outputs(cell: dict) -> bool:
-    return bool(cell.get("outputs", []))
-
-
-def cell_has_metadata_key(cell: dict, regex: str) -> bool:
-    pattern = re.compile(regex)
-    return any(pattern.match(key) for key in cell.get("metadata", {}))
-
-
-def check_notebook_is_clean(nb: dict, meta: str = "") -> None:
-    for cell in iter_code_cells(nb):
-        if cell_has_outputs(cell):
-            raise DirtyNotebookError("Notebook contains outputs")
-        elif cell_has_execution_count(cell):
-            raise DirtyNotebookError("Notebook contains execution counts")
-        elif meta and cell_has_metadata_key(cell, meta):
-            raise DirtyNotebookError("Notebook contains blacklisted cell metadata")
 
 
 echo = partial(click.secho, err=True)
+hecho = partial(click.secho, err=True, bold=True, fg="magenta")
 
 
 @click.command(context_settings=dict(help_option_names=["-h", "--help"]))
@@ -100,9 +137,8 @@ def main(ctx: click.Context, src: str, meta: str, quiet: bool, verbose: bool):
 
     report = []
     for s in sorted(sources):
-        if not quiet:
-            echo(".", nl=False)
 
+        # Read files
         d = {"name": getattr(s, "name", s)}
         report.append(d)
         try:
@@ -112,73 +148,22 @@ def main(ctx: click.Context, src: str, meta: str, quiet: bool, verbose: bool):
             d["error"] = str(e)
             continue
 
+        # Process
         try:
-            check_notebook_is_clean(nb, meta=meta)
+            hecho("Processing: "+s)
+            hecho("***********************************************")
+            process_file(nb, meta=meta)
             d["status"] = CLEAN
         except DirtyNotebookError as e:
             d["status"] = DIRTY
             d["error"] = str(e)
+            nbformat.write(nb, s)
 
-    if not quiet:
-        echo("\n")
-
-    # echo(format_report(report, quiet=quiet, verbose=verbose))
-
+    # Exit
     if any(d["status"] == DIRTY for d in report):
-        echo(":(", bold=True, fg="red")
+        # echo(":(", bold=True, fg="red")
         exit_code = EXIT_CODES["dirty"]
     else:
-        echo(":)", bold=True, fg="green")
+        # echo(":)", bold=True, fg="green")
         exit_code = EXIT_CODES["clean"]
     ctx.exit(exit_code)
-
-
-def format_report(report: list, quiet: bool = False, verbose: bool = False) -> str:
-    lines = []
-    counts = Counter(d["status"] for d in report)
-    colors = {DIRTY: "red", CLEAN: "green", IGNORED: "yellow"}
-
-    if quiet:
-        verbose = False
-
-    for d in report:
-        if not verbose and d["status"] != DIRTY:
-            continue
-        lines.append(
-            "{}{}".format(
-                click.style(d["status"].ljust(8), fg=colors[d["status"]]), d["name"]
-            )
-        )
-        if d["status"] == DIRTY:
-            lines.append("{}{}".format("".ljust(8), click.style(d["error"], bold=True)))
-
-    if lines:
-        lines.append("")
-
-    if not quiet and not report:
-        lines.append("No files were checked")
-
-    if not quiet:
-        messages = []
-        if counts.get(DIRTY):
-            messages.append(
-                "{} {} dirty".format(
-                    counts[DIRTY], "file is" if counts[DIRTY] == 1 else "files are"
-                )
-            )
-        if counts.get(CLEAN):
-            messages.append(
-                "{} {} clean".format(
-                    counts[CLEAN], "file is" if counts[CLEAN] == 1 else "files are"
-                )
-            )
-        if counts.get(IGNORED):
-            messages.append(
-                "{} {} ignored".format(
-                    counts[IGNORED],
-                    "file was" if counts[IGNORED] == 1 else "files were",
-                )
-            )
-        lines.append(click.style(", ".join(messages), bold=True))
-
-    return "\n".join(lines)
