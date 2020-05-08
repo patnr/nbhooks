@@ -122,7 +122,7 @@ def main(ctx: click.Context, src: str, meta: str, quiet: bool, verbose: bool):
     if not quiet:
         echo("\n")
 
-    echo(format_report(report, quiet=quiet, verbose=verbose))
+    # echo(format_report(report, quiet=quiet, verbose=verbose))
 
     if any(d["status"] == DIRTY for d in report):
         echo(":(", bold=True, fg="red")
