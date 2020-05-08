@@ -85,6 +85,7 @@ def main(ctx: click.Context, src: str, meta: str, quiet: bool, verbose: bool):
 
     The exit code is 1 if any notebook is dirty, 0 otherwise.
     """
+    echo("In main.")
     sources = set()
     for s in src:
         p = Path(s)
@@ -101,7 +102,8 @@ def main(ctx: click.Context, src: str, meta: str, quiet: bool, verbose: bool):
     report = []
     for s in sorted(sources):
         if not quiet:
-            echo(".", nl=False)
+            # echo(".", nl=False)
+            echo(s)
 
         d = {"name": getattr(s, "name", s)}
         report.append(d)
