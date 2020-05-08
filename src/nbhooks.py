@@ -101,7 +101,8 @@ def main(ctx: click.Context, src: str, meta: str, quiet: bool, verbose: bool):
     report = []
     for s in sorted(sources):
         if not quiet:
-            echo(".", nl=False)
+            # echo(".", nl=False)
+            echo(s)
 
         d = {"name": getattr(s, "name", s)}
         report.append(d)
