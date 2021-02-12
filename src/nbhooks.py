@@ -82,6 +82,10 @@ def echo(*args, **kwargs):
     return click.secho(*args, **kwargs)
 
 
+class DirtyNotebookError(Exception):
+    pass
+
+
 def process_cell(cell, meta):
     # Find issues
     issues = []
@@ -105,10 +109,6 @@ def process_cell(cell, meta):
     return bool(issues)
 
 
-class DirtyNotebookError(Exception):
-    pass
-
-
 def process_file(nb, meta):
 
     had_issues = False
@@ -120,6 +120,9 @@ def process_file(nb, meta):
         raise DirtyNotebookError("Notebook had issues.")
 
 
+###########
+#  Click  #
+###########
 @click.command(context_settings=dict(help_option_names=["-h", "--help"]))
 @click.argument("src", required=False, nargs=-1)
 @click.option("-m", "--meta", multiple=True, default=["pin_output"],
