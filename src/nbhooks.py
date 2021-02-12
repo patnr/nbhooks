@@ -16,12 +16,11 @@ EXIT_CODES = {
 }
 
 
-def echo(*args, **kwargs):
-    kwargs["err"] = kwargs.get("err", True)
-    return click.secho(*args, **kwargs)
+#######################
+#  Individual issues  #
+#######################
 
-
-def i_exec(cell, meta):
+def has_exec_count(cell, meta):
     statement = "non-null execution_count"
     unpinned = ("pin_output" not in cell["metadata"])
 
@@ -34,7 +33,7 @@ def i_exec(cell, meta):
     return statement, condition, fix
 
 
-def i_output(cell, meta):
+def has_output(cell, meta):
     statement = "output without 'pin_output'"
     unpinned = ("pin_output" not in cell["metadata"])
 
@@ -47,7 +46,7 @@ def i_output(cell, meta):
     return statement, condition, fix
 
 
-def i_meta(cell, meta):
+def has_meta(cell, meta):
     statement = "non-whitelisted metadata"
     without_meta = {k: v for k, v in cell["metadata"].items() if k not in meta}
     with_meta = {k: v for k, v in cell["metadata"].items() if k in meta}
@@ -61,7 +60,7 @@ def i_meta(cell, meta):
     return statement, condition, fix
 
 
-def i_answer(cell, meta):
+def answer_uncommented(cell, meta):
     statement = "de-commented show_answer"
 
     def condition():
@@ -75,10 +74,18 @@ def i_answer(cell, meta):
     return statement, condition, fix
 
 
+##########
+#  Main  #
+##########
+def echo(*args, **kwargs):
+    kwargs["err"] = kwargs.get("err", True)
+    return click.secho(*args, **kwargs)
+
+
 def process_cell(cell, meta):
     # Find issues
     issues = []
-    for issue in [i_exec, i_output, i_meta, i_answer]:
+    for issue in [has_exec_count, has_output, has_meta, answer_uncommented]:
         statement, condition, fix = issue(cell, meta)
         if condition():
             issues.append([statement, fix])
