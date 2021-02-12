@@ -11,7 +11,7 @@ Here is a sample config to include in the `.pre-commit-config.yaml` file:
 
 ```yaml
 - repo: https://github.com/patricknraanes/nbhooks.git
-  rev: X.Y.Z  # Set to the most recent version
+  rev: X.Y.Z  # Use `pre-commit autoupdate --bleeding-edge` to set to most recent version
   hooks:
   - id: nb-ensure-clean
     args: [--meta, pin_output]  # Optional WHITELIST of metadata keys (you can use regex)
