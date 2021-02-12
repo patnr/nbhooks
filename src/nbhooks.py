@@ -22,9 +22,9 @@ EXIT_CODES = {
 #######################
 class Issue(ABC):
     """Detect, state, and fix issue for one cell in a notebook."""
-    def __init__(self, cell, meta):
+    def __init__(self, cell, whitelist):
         self.cell = cell
-        self.meta = meta
+        self.whitelist = whitelist
 
     @property
     @abstractmethod
@@ -72,12 +72,12 @@ class HasMeta(Issue):
         return "non-whitelisted metadata"
 
     def condition(self):
-        return [k for k in self.cell["metadata"] if k not in self.meta]
+        return [k for k in self.cell["metadata"] if k not in self.whitelist]
 
     def fix(self):
         self.cell["metadata"] = {
             k: v for k, v in self.cell["metadata"].items()
-            if k in self.meta
+            if k in self.whitelist
         }
 
 
@@ -108,11 +108,11 @@ class DirtyNotebookError(Exception):
     pass
 
 
-def process_cell(cell, meta):
+def process_cell(cell, whitelist):
     # Find issues
     issues = []
     for cls in Issue.__subclasses__():
-        x = cls(cell, meta)  # type: ignore
+        x = cls(cell, whitelist)  # type: ignore
         if x.condition():
             issues.append(x)
 
@@ -132,12 +132,12 @@ def process_cell(cell, meta):
     return bool(issues)
 
 
-def process_file(nb, meta):
+def process_file(nb, whitelist):
 
     had_issues = False
     for cell in nb["cells"]:
         if cell["cell_type"] == "code":
-            had_issues |= process_cell(cell, meta)
+            had_issues |= process_cell(cell, whitelist)
 
     if had_issues:
         raise DirtyNotebookError("Notebook had issues.")
