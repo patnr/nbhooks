@@ -110,11 +110,11 @@ class ColabInMaster(Issue):
         return "Colab-related stuff found in master branch."
 
     def condition(self):
-        return (
-            GIT_BRANCH.lower() != "colab"
-            and any(all(word in ln for word in ["raw", "colab_bootstrap"])  # noqa
-                    for ln in self.cell["source"].split("\n"))
-        )
+        is_colab = GIT_BRANCH.lower() != "colab"
+        smells_like_colab = any(
+            all(word in ln for word in ["raw", "colab_bootstrap"])
+            for ln in self.cell["source"].split("\n"))
+        return is_colab == smells_like_colab
 
     def fix(self):
         pass  # manual fix required
