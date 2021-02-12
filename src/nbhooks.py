@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import json
 from pathlib import Path
 import re
+import subprocess
 import sys
 
 import click
@@ -15,6 +16,12 @@ EXIT_CODES = {
     # "invalid usage": 2, - this is handled by click
     "invalid_path": 3,
 }
+
+
+GIT_BRANCH = subprocess.run(
+    ["git", "branch", "--show-current"],
+    check=True, capture_output=True, text=True
+).stdout.strip()
 
 
 #######################
@@ -94,6 +101,23 @@ class AnswerUncommented(Issue):
         new = self.cell["source"].split("\n")
         new = [re.sub(r"^ *show_answer", r"#show_answer", ln) for ln in new]
         self.cell["source"] = "\n".join(new)
+
+
+class ColabInMaster(Issue):
+    """Search for colab_bootstrap."""
+
+    def statement(self):
+        return "Colab-related stuff found in master branch."
+
+    def condition(self):
+        return (
+            GIT_BRANCH.lower() != "colab"
+            and any(all(word in ln for word in ["raw", "colab_bootstrap"])  # noqa
+                    for ln in self.cell["source"].split("\n"))
+        )
+
+    def fix(self):
+        pass  # manual fix required
 
 
 ##########
