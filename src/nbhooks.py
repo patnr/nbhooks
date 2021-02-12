@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import json
 from pathlib import Path
 import re
@@ -19,59 +20,80 @@ EXIT_CODES = {
 #######################
 #  Individual issues  #
 #######################
+class Issue(ABC):
+    """Detect, state, and fix issue for one cell in a notebook."""
+    def __init__(self, cell, meta):
+        self.cell = cell
+        self.meta = meta
 
-def has_exec_count(cell, meta):
-    statement = "non-null execution_count"
-    unpinned = ("pin_output" not in cell["metadata"])
+    @property
+    @abstractmethod
+    def statement(self):
+        pass
 
-    def condition():
-        return (cell["execution_count"] is not None) and unpinned
+    @abstractmethod
+    def condition(self):
+        pass
 
-    def fix():
-        cell["execution_count"] = None
-
-    return statement, condition, fix
-
-
-def has_output(cell, meta):
-    statement = "output without 'pin_output'"
-    unpinned = ("pin_output" not in cell["metadata"])
-
-    def condition():
-        return cell["outputs"] and unpinned
-
-    def fix():
-        cell["outputs"] = []
-
-    return statement, condition, fix
+    @abstractmethod
+    def fix(self):
+        pass
 
 
-def has_meta(cell, meta):
-    statement = "non-whitelisted metadata"
-    without_meta = {k: v for k, v in cell["metadata"].items() if k not in meta}
-    with_meta = {k: v for k, v in cell["metadata"].items() if k in meta}
+class HasExeCount(Issue):
 
-    def condition():
-        return without_meta
+    def statement(self):
+        return "non-null execution_count"
 
-    def fix():
-        cell["metadata"] = with_meta
+    def condition(self):
+        unpinned = "pin_output" not in self.cell["metadata"]
+        return (self.cell["execution_count"] is not None) and unpinned
 
-    return statement, condition, fix
+    def fix(self):
+        self.cell["execution_count"] = None
 
 
-def answer_uncommented(cell, meta):
-    statement = "de-commented show_answer"
+class HasOutput(Issue):
 
-    def condition():
-        return any(re.match(" *show_answer", ln) for ln in cell["source"].split("\n"))
+    def statement(self):
+        return "output without 'pin_output'"
 
-    def fix():
-        new = cell["source"].split("\n")
+    def condition(self):
+        unpinned = "pin_output" not in self.cell["metadata"]
+        return self.cell["outputs"] and unpinned
+
+    def fix(self):
+        self.cell["outputs"] = []
+
+
+class HasMeta(Issue):
+
+    def statement(self):
+        return "non-whitelisted metadata"
+
+    def condition(self):
+        return [k for k in self.cell["metadata"] if k not in self.meta]
+
+    def fix(self):
+        self.cell["metadata"] = {
+            k: v for k, v in self.cell["metadata"].items()
+            if k in self.meta
+        }
+
+
+class AnswerUncommented(Issue):
+
+    def statement(self):
+        return "un-commented show_answer"
+
+    def condition(self):
+        return any(re.match(" *show_answer", ln)
+                   for ln in self.cell["source"].split("\n"))
+
+    def fix(self):
+        new = self.cell["source"].split("\n")
         new = [re.sub(r"^ *show_answer", r"#show_answer", ln) for ln in new]
-        cell["source"] = "\n".join(new)
-
-    return statement, condition, fix
+        self.cell["source"] = "\n".join(new)
 
 
 ##########
@@ -89,21 +111,22 @@ class DirtyNotebookError(Exception):
 def process_cell(cell, meta):
     # Find issues
     issues = []
-    for issue in [has_exec_count, has_output, has_meta, answer_uncommented]:
-        statement, condition, fix = issue(cell, meta)
-        if condition():
-            issues.append([statement, fix])
+    for cls in Issue.__subclasses__():
+        x = cls(cell, meta)  # type: ignore
+        if x.condition():
+            issues.append(x)
 
-    # Print issues
+    # Print
+    messgs = [x.statement() for x in issues]
     if issues:
-        echo("These issues:", fg="red")
-        echo("- " + "\n- ".join([issue[0] for issue in issues]), fg="yellow")
+        echo("These issues:",            fg="red")  # noqa
+        echo("- " + "\n- ".join(messgs), fg="yellow")
         echo("were fixed in this cell:", fg="red")
         echo(json.dumps(cell, indent=4))
 
     # Fix issues
-    for issue in issues:
-        issue[1]()
+    for x in issues:
+        x.fix()
 
     # Report
     return bool(issues)
@@ -159,7 +182,10 @@ def main(ctx: click.Context, src: str, meta: list):
         echo("File: " + s, fg="magenta")
         try:
             nb = nbformat.read(s, as_version=4)
-
+        except Exception:
+            echo("File could not be read.", fg="red")
+            found_issues = True
+        else:
             # Process
             try:
                 process_file(nb, meta)
@@ -167,9 +193,6 @@ def main(ctx: click.Context, src: str, meta: list):
             except DirtyNotebookError:
                 nbformat.write(nb, s)
                 found_issues = True
-        except Exception:
-            echo("File could not be read.", fg="red")
-            found_issues = True
 
     # Exit
     if found_issues:
