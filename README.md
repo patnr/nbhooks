@@ -49,7 +49,7 @@ cd nbhooks
 pip install .
 nb-ensure-clean --help
 
-# For development purposes, try `pip -e`, or alternatively:
+# For development purposes, try `pip install -e`, or:
 cd /path/to/my_project
 pre-commit try-repo path/to/nbhooks nb-ensure-clean --verbose --all-files
 ```
