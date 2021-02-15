@@ -117,7 +117,7 @@ class ColabInMaster(Issue):
         return is_colab == smells_like_colab
 
     def fix(self):
-        self.cell["source"] = None
+        return -1
 
 
 ##########
@@ -168,12 +168,9 @@ def process_cell(cell, whitelist):
 def process_file(nb, whitelist):
 
     had_issues = False
-    for i, cell in enumerate(list(nb["cells"])):
+    for cell in nb["cells"]:
         if cell["cell_type"] == "code":
             had_issues |= process_cell(cell, whitelist)
-            # Rm deleted cells
-            if cell["source"] is None:
-                del nb["cells"][i]
 
     if had_issues:
         raise DirtyNotebookError("Notebook had issues.")
