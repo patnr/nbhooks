@@ -117,7 +117,7 @@ class ColabInMaster(Issue):
         return is_colab == smells_like_colab
 
     def fix(self):
-        pass  # manual fix required
+        return -1
 
 
 ##########
@@ -140,17 +140,26 @@ def process_cell(cell, whitelist):
         if x.condition():
             issues.append(x)
 
-    # Print
-    messgs = [x.statement() for x in issues]
-    if issues:
+    # Fix issues
+    fixed = []
+    for x in issues:
+        if x.fix() != -1:
+            fixed.append(x)
+
+    # Print fixed
+    messgs = [x.statement() for x in fixed]
+    if messgs:
         echo("These issues:",            fg="red")  # noqa
         echo("- " + "\n- ".join(messgs), fg="yellow")
         echo("were fixed in this cell:", fg="red")
         echo(json.dumps(cell, indent=4))
-
-    # Fix issues
-    for x in issues:
-        x.fix()
+    # Print not fixed
+    messgs = [x.statement() for x in issues if x not in fixed]
+    if messgs:
+        echo("These issues:",             fg="red")  # noqa
+        echo("- " + "\n- ".join(messgs),  fg="yellow")  # noqa
+        echo("need fixing in this cell:", fg="red")
+        echo(json.dumps(cell, indent=4))
 
     # Report
     return bool(issues)
