@@ -4,7 +4,7 @@ import sys
 from subprocess import check_output
 import re
 
-from pylib.std import *
+from patlib.std import *
 
 def print_c(*args,c='blue',**kwargs):
     """Print with color."""
