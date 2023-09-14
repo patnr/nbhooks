@@ -1,11 +1,9 @@
 # nbhooks
 
-This repository provides scripts which help with keeping
-the Jupyter notebooks of [DA-tutorials](https://github.com/nansencenter/DA-tutorials)
+Help keeping Jupyter notebooks of [DA-tutorials](https://github.com/nansencenter/DA-tutorials)
 under revision control in git.
-They are meant to be used with the
-[pre-commit](https://pre-commit.com) framework.
-To use these hooks, put this in your `.pre-commit-config.yaml` file:
+Use with the [pre-commit](https://pre-commit.com) framework
+by put this in your `.pre-commit-config.yaml` file
 
 ```yaml
 - repo: https://github.com/patricknraanes/nbhooks.git
@@ -15,27 +13,21 @@ To use these hooks, put this in your `.pre-commit-config.yaml` file:
     args: [--meta, pin_output]  # Optional WHITELIST of metadata keys (you can use regex)
 ```
 
-## Hooks
+## Hook: nb-ensure-clean
 
-### nb-ensure-clean
-
-Use this hook to prevent commiting "dirty" notebooks, i.e. notebooks which contain:
+Use this hook to prevent committing "dirty" notebooks, i.e. notebooks which contain:
 
 * outputs
 * execution counts
-* blacklisted metadata keys (you have to define the blacklist,
-  see sample config)
+* blacklisted metadata keys (you have to define the blacklist, see sample config)
 
 ## Changes since fork
 
 Since the fork from [here](https://gitlab.com/iamlikeme/nbhooks),
-the code has been restructured.
-It now also checks for
 
-* Uncommendted `show_answer` occurences.
-* Ensure Colab stuff is not in master branch.
-
-And it automatically changes files to fix issues.
+* the code has been restructured.
+* it checks for uncommented `show_answer` occurrences.
+* it automatically changes files to fix issues.
 
 ## Development
 

@@ -22,7 +22,11 @@ GIT_BRANCH = subprocess.run(
     ["git", "branch", "--show-current"],
     check=True, capture_output=True, text=True
 ).stdout.strip()
-IS_COLAB = GIT_BRANCH.lower() == "colab"
+
+
+def echo(*args, **kwargs):
+    kwargs["err"] = kwargs.get("err", True)
+    return click.secho(*args, **kwargs)
 
 
 #######################
@@ -107,11 +111,6 @@ class AnswerUncommented(CellIssue):
 ##########
 #  Main  #
 ##########
-def echo(*args, **kwargs):
-    kwargs["err"] = kwargs.get("err", True)
-    return click.secho(*args, **kwargs)
-
-
 class DirtyNotebookError(Exception):
     pass
 
@@ -149,35 +148,12 @@ def process_cell(cell, whitelist):
     return bool(issues)
 
 
-# This issue must search all cells, and so cannot be implemented as a CellIssue.
-# It is also non-obvious to fix. Deletion is simple, but not insertion (for Colab branch).
-def has_colab_issue(cells):
-    """Search for colab_bootstrap."""
-
-    # Search for colab_bootstrap
-    smells_like_colab = False
-    for cell in cells:
-        if cell["cell_type"] == "code":
-            smells_like_colab |= any(
-                all(word in ln for word in ["raw", "colab_bootstrap"])
-                for ln in cell["source"].split("\n"))
-
-    # Determine if mismatch
-    if IS_COLAB != smells_like_colab:
-        NOT = ("NOT " if IS_COLAB else "")
-        echo(f"colab_bootstrap {NOT}found.", fg="yellow")
-        return True
-
-    return False
-
-
 def process_file(nb, whitelist):
 
     had_issues = False
     for cell in nb["cells"]:
         if cell["cell_type"] == "code":
             had_issues |= process_cell(cell, whitelist)
-    had_issues |= has_colab_issue(nb["cells"])
 
     if had_issues:
         raise DirtyNotebookError("Notebook had issues.")
