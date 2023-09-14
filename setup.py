@@ -45,7 +45,7 @@ setup(
     python_requires="~= 3.5",
     install_requires=[
         "click >= 7.0",
-        "nbformat ~= 4.0",
+        "nbformat ~= 5.0",
     ],
     extras_require=extras_require,
     entry_points={
